@@ -30,6 +30,7 @@
   .pt { cursor:pointer; }
   .pt:hover { fill:rgba(74,63,48,.07); }
   .piece { cursor:pointer; }
+  .piece:hover circle:first-child { filter:drop-shadow(0 0 7px rgba(190,150,70,.5)); }
   .piece.sel { animation:blink .55s ease-in-out infinite; }
   @keyframes blink { 0%,100% { opacity:1; } 50% { opacity:.18; } }
   .controls { margin-top:14px; display:flex; gap:14px; justify-content:center; align-items:center; }
@@ -138,6 +139,7 @@
       var x = XY[i][0], y = XY[i][1];
       var g = document.createElementNS(NS, 'g');
       g.setAttribute('class', 'piece' + (selected === i ? ' sel' : '') + ' p' + i);
+      g.dataset.i = i;
       var base = document.createElementNS(NS, 'circle');
       base.setAttribute('cx', x); base.setAttribute('cy', y); base.setAttribute('r', 34);
       base.setAttribute('fill', state[i] === 'W' ? 'url(#gW)' : 'url(#gB)');
@@ -184,9 +186,9 @@
 
   svg.addEventListener('click', function (e) {
     if (over) return;
-    var pt = e.target;
-    if (!pt.classList || !pt.classList.contains('pt')) return;
-    var i = +pt.dataset.i;
+    var el = e.target.closest ? e.target.closest('.pt, .piece') : null;
+    if (!el) return;
+    var i = +el.dataset.i;
     if (selected === null) {
       if (state[i] === turn) {
         if (frozen(i)) hint('第一手不能动' + NAMES[i]);
@@ -203,8 +205,10 @@
       checkWin(mover);
       if (!over) turn = turn === 'W' ? 'B' : 'W';
       render();
+    } else if (state[i] === turn && !frozen(i)) {
+      selected = i; render();          // 点己方另一子:改选
     } else {
-      selected = null; render();  // 错误落点:保留原位,取消闪烁
+      selected = null; render();       // 错误落点:保留原位,取消闪烁
     }
   });
 
