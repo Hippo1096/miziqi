@@ -95,7 +95,7 @@
   </div>
   <p class="hint">
     点己方棋子选中（闪烁），再点沿线相邻空位落子；点错位置自动取消选中。<br>
-    全局第一手：左下、右上两子不可动。三子全部占据对方初始位即胜。
+    全局第一手：左下、右上两子不可动。三子连成横排或竖排即胜（斜排不算）；对方无子可动亦胜。
   </p>
 </div>
 <script>
@@ -112,7 +112,7 @@
 
   var INIT = { 1: 'B', 2: 'B', 3: 'W', 5: 'B', 6: 'W', 7: 'W' };   // 白:左/左下/下 黑:上/右上/右
   var FROZEN_FIRST = { 6: true, 2: true };                          // 第一手:左下、右上不可动
-  var W_GOAL = [1, 2, 5], B_GOAL = [3, 6, 7];                       // 换位取胜目标
+  var LINES = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8]];   // 横三排+竖三排成线即胜(斜排不算)
   var NS = 'http://www.w3.org/2000/svg';
 
   var state, selected, turn, moveCount, over, hintTimer;
@@ -124,15 +124,9 @@
     render();
   }
 
-  function neighbors(i) {
-    var r = (i / 3) | 0, c = i % 3, out = [];
-    for (var dr = -1; dr <= 1; dr++) for (var dc = -1; dc <= 1; dc++) {
-      if (!dr && !dc) continue;
-      var rr = r + dr, cc = c + dc;
-      if (rr >= 0 && rr < 3 && cc >= 0 && cc < 3) out.push(rr * 3 + cc);
-    }
-    return out;
-  }
+  // 米字格相邻:沿横/竖/斜线一步。边缘中点只有 3 个邻居,中心 8 个,角 3 个
+  var ADJ = { 0:[1,3,4], 1:[0,2,4], 2:[1,5,4], 3:[0,6,4], 4:[0,1,2,3,5,6,7,8], 5:[2,8,4], 6:[3,7,4], 7:[6,8,4], 8:[5,7,4] };
+  function neighbors(i) { return ADJ[i]; }
 
   function frozen(i) { return moveCount === 0 && FROZEN_FIRST[i]; }
 
@@ -166,10 +160,26 @@
     hintTimer = setTimeout(function () { if (!over) render(); }, 1400);
   }
 
-  function checkWin() {
-    var w = W_GOAL.every(function (i) { return state[i] === 'W'; });
-    var b = B_GOAL.every(function (i) { return state[i] === 'B'; });
-    if (w || b) { over = true; statusEl.textContent = w ? '白棋胜！' : '黑棋胜！'; }
+  function threeInLine(p) {
+    return LINES.some(function (L) { return L.every(function (i) { return state[i] === p; }); });
+  }
+
+  function hasMoves(p) {
+    for (var i = 0; i < 9; i++) {
+      if (state[i] !== p) continue;
+      var ns = neighbors(i);
+      for (var k = 0; k < ns.length; k++) if (!state[ns[k]]) return true;
+    }
+    return false;
+  }
+
+  function checkWin(mover) {
+    var opp = mover === 'W' ? 'B' : 'W';
+    if (threeInLine(mover)) {
+      over = true; statusEl.textContent = mover === 'W' ? '白棋胜！' : '黑棋胜！';
+    } else if (!hasMoves(opp)) {
+      over = true; statusEl.textContent = (mover === 'W' ? '白棋胜！' : '黑棋胜！') + '（' + (opp === 'W' ? '白' : '黑') + '棋被堵死）';
+    }
   }
 
   svg.addEventListener('click', function (e) {
@@ -189,7 +199,8 @@
       state[i] = state[selected];
       state[selected] = null;
       selected = null; moveCount++;
-      checkWin();
+      var mover = state[i];
+      checkWin(mover);
       if (!over) turn = turn === 'W' ? 'B' : 'W';
       render();
     } else {
