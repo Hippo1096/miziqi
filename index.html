@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>米字格 · 三子换位</title>
+<!-- AI-Provenance: Kimi-Claw [0D63EBB1] | 2026-09-24 | 项目 092401-米字格换位棋 | 需求:桃子 米字格九点位移小游戏 | 风格参考:宋代极简(宣纸+墨色) + 云子围棋质感 -->
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background:#f3ecdd;
+    background-image:radial-gradient(circle at 20% 10%, rgba(255,255,255,.5), transparent 60%),
+                     radial-gradient(circle at 85% 90%, rgba(120,100,70,.12), transparent 55%);
+    min-height:100vh;
+    display:flex; align-items:center; justify-content:center;
+    font-family:"Songti SC","Noto Serif CJK SC","STSong",serif;
+    color:#3a3226;
+  }
+  .wrap { width:min(520px, 94vw); text-align:center; padding:24px 0 40px; }
+  h1 { font-size:26px; letter-spacing:8px; font-weight:600; margin-bottom:6px; }
+  .sub { font-size:13px; color:#8a7d68; letter-spacing:2px; margin-bottom:14px; }
+  .status {
+    display:inline-block; min-width:9em;
+    font-size:17px; letter-spacing:4px;
+    padding:7px 18px; margin-bottom:12px;
+    border:1.5px solid #4a3f30; border-radius:4px;
+    background:rgba(255,255,255,.45);
+  }
+  svg { width:100%; height:auto; display:block; }
+  .pt { cursor:pointer; }
+  .pt:hover { fill:rgba(74,63,48,.07); }
+  .piece { cursor:pointer; }
+  .piece.sel { animation:blink .55s ease-in-out infinite; }
+  @keyframes blink { 0%,100% { opacity:1; } 50% { opacity:.18; } }
+  .controls { margin-top:14px; display:flex; gap:14px; justify-content:center; align-items:center; }
+  button {
+    font-family:inherit; font-size:16px; letter-spacing:6px; text-indent:6px;
+    padding:9px 26px; cursor:pointer;
+    color:#f3ecdd; background:#3a3226; border:1.5px solid #3a3226; border-radius:4px;
+    transition:all .15s;
+  }
+  button:hover { background:transparent; color:#3a3226; }
+  #moves { font-size:14px; color:#8a7d68; letter-spacing:2px; }
+  .hint { margin-top:16px; font-size:13px; line-height:1.9; color:#8a7d68; letter-spacing:1px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>米字格 · 三子换位</h1>
+  <div class="sub">白居左下 · 黑居右上 · 各循线一步</div>
+  <div class="status" id="status">白棋行棋</div>
+  <svg id="board" viewBox="0 0 480 480" aria-label="米字格棋盘">
+    <defs>
+      <radialGradient id="gW" cx="35%" cy="30%" r="80%">
+        <stop offset="0%" stop-color="#ffffff"/>
+        <stop offset="70%" stop-color="#f1ede2"/>
+        <stop offset="100%" stop-color="#d6ceba"/>
+      </radialGradient>
+      <radialGradient id="gB" cx="35%" cy="30%" r="80%">
+        <stop offset="0%" stop-color="#6f6f6f"/>
+        <stop offset="45%" stop-color="#2b2b2b"/>
+        <stop offset="100%" stop-color="#0a0a0a"/>
+      </radialGradient>
+    </defs>
+    <g stroke="#4a3f30" stroke-width="3" stroke-linecap="round">
+      <line x1="90" y1="90" x2="390" y2="90"/>
+      <line x1="90" y1="240" x2="390" y2="240"/>
+      <line x1="90" y1="390" x2="390" y2="390"/>
+      <line x1="90" y1="90" x2="90" y2="390"/>
+      <line x1="240" y1="90" x2="240" y2="390"/>
+      <line x1="390" y1="90" x2="390" y2="390"/>
+      <line x1="90" y1="90" x2="390" y2="390"/>
+      <line x1="390" y1="90" x2="90" y2="390"/>
+    </g>
+    <g fill="#4a3f30">
+      <circle cx="90" cy="90" r="4"/><circle cx="240" cy="90" r="4"/><circle cx="390" cy="90" r="4"/>
+      <circle cx="90" cy="240" r="4"/><circle cx="240" cy="240" r="4"/><circle cx="390" cy="240" r="4"/>
+      <circle cx="90" cy="390" r="4"/><circle cx="240" cy="390" r="4"/><circle cx="390" cy="390" r="4"/>
+    </g>
+    <g id="pts" fill="transparent">
+      <circle class="pt" data-i="0" cx="90"  cy="90"  r="42"/>
+      <circle class="pt" data-i="1" cx="240" cy="90"  r="42"/>
+      <circle class="pt" data-i="2" cx="390" cy="90"  r="42"/>
+      <circle class="pt" data-i="3" cx="90"  cy="240" r="42"/>
+      <circle class="pt" data-i="4" cx="240" cy="240" r="42"/>
+      <circle class="pt" data-i="5" cx="390" cy="240" r="42"/>
+      <circle class="pt" data-i="6" cx="90"  cy="390" r="42"/>
+      <circle class="pt" data-i="7" cx="240" cy="390" r="42"/>
+      <circle class="pt" data-i="8" cx="390" cy="390" r="42"/>
+    </g>
+  </svg>
+  <div class="controls">
+    <button id="reset" type="button">重 置</button>
+    <span id="moves">手数 0</span>
+  </div>
+  <p class="hint">
+    点己方棋子选中（闪烁），再点沿线相邻空位落子；点错位置自动取消选中。<br>
+    全局第一手：左下、右上两子不可动。三子全部占据对方初始位即胜。
+  </p>
+</div>
+<script>
+(function () {
+  'use strict';
+  var svg = document.getElementById('board');
+  var statusEl = document.getElementById('status');
+  var movesEl = document.getElementById('moves');
+  var resetBtn = document.getElementById('reset');
+
+  var NAMES = ['左上', '上', '右上', '左', '中', '右', '左下', '下', '右下'];
+  var XY = [];
+  for (var r = 0; r < 3; r++) for (var c = 0; c < 3; c++) XY.push([90 + 150 * c, 90 + 150 * r]);
+
+  var INIT = { 1: 'B', 2: 'B', 3: 'W', 5: 'B', 6: 'W', 7: 'W' };   // 白:左/左下/下 黑:上/右上/右
+  var FROZEN_FIRST = { 6: true, 2: true };                          // 第一手:左下、右上不可动
+  var W_GOAL = [1, 2, 5], B_GOAL = [3, 6, 7];                       // 换位取胜目标
+  var NS = 'http://www.w3.org/2000/svg';
+
+  var state, selected, turn, moveCount, over, hintTimer;
+
+  function reset() {
+    state = [null, null, null, null, null, null, null, null, null];
+    for (var k in INIT) state[k] = INIT[k];
+    selected = null; turn = 'W'; moveCount = 0; over = false;
+    render();
+  }
+
+  function neighbors(i) {
+    var r = (i / 3) | 0, c = i % 3, out = [];
+    for (var dr = -1; dr <= 1; dr++) for (var dc = -1; dc <= 1; dc++) {
+      if (!dr && !dc) continue;
+      var rr = r + dr, cc = c + dc;
+      if (rr >= 0 && rr < 3 && cc >= 0 && cc < 3) out.push(rr * 3 + cc);
+    }
+    return out;
+  }
+
+  function frozen(i) { return moveCount === 0 && FROZEN_FIRST[i]; }
+
+  function render() {
+    var olds = svg.querySelectorAll('.piece');
+    for (var j = 0; j < olds.length; j++) olds[j].remove();
+    for (var i = 0; i < 9; i++) {
+      if (!state[i]) continue;
+      var x = XY[i][0], y = XY[i][1];
+      var g = document.createElementNS(NS, 'g');
+      g.setAttribute('class', 'piece' + (selected === i ? ' sel' : '') + ' p' + i);
+      var base = document.createElementNS(NS, 'circle');
+      base.setAttribute('cx', x); base.setAttribute('cy', y); base.setAttribute('r', 34);
+      base.setAttribute('fill', state[i] === 'W' ? 'url(#gW)' : 'url(#gB)');
+      base.setAttribute('stroke', 'rgba(40,30,20,.6)');
+      base.setAttribute('stroke-width', '1.5');
+      g.appendChild(base);
+      var hl = document.createElementNS(NS, 'circle');
+      hl.setAttribute('cx', x - 11); hl.setAttribute('cy', y - 13); hl.setAttribute('r', 9);
+      hl.setAttribute('fill', 'rgba(255,255,255,' + (state[i] === 'W' ? '0.55' : '0.28') + ')');
+      g.appendChild(hl);
+      svg.appendChild(g);
+    }
+    if (!over) statusEl.textContent = turn === 'W' ? '白棋行棋' : '黑棋行棋';
+    movesEl.textContent = '手数 ' + moveCount;
+  }
+
+  function hint(t) {
+    statusEl.textContent = t;
+    clearTimeout(hintTimer);
+    hintTimer = setTimeout(function () { if (!over) render(); }, 1400);
+  }
+
+  function checkWin() {
+    var w = W_GOAL.every(function (i) { return state[i] === 'W'; });
+    var b = B_GOAL.every(function (i) { return state[i] === 'B'; });
+    if (w || b) { over = true; statusEl.textContent = w ? '白棋胜！' : '黑棋胜！'; }
+  }
+
+  svg.addEventListener('click', function (e) {
+    if (over) return;
+    var pt = e.target;
+    if (!pt.classList || !pt.classList.contains('pt')) return;
+    var i = +pt.dataset.i;
+    if (selected === null) {
+      if (state[i] === turn) {
+        if (frozen(i)) hint('第一手不能动' + NAMES[i]);
+        else { selected = i; render(); }
+      }
+      return;
+    }
+    if (i === selected) { selected = null; render(); return; }
+    if (!state[i] && neighbors(selected).indexOf(i) !== -1) {
+      state[i] = state[selected];
+      state[selected] = null;
+      selected = null; moveCount++;
+      checkWin();
+      if (!over) turn = turn === 'W' ? 'B' : 'W';
+      render();
+    } else {
+      selected = null; render();  // 错误落点:保留原位,取消闪烁
+    }
+  });
+
+  resetBtn.addEventListener('click', reset);
+  reset();
+})();
+</script>
+</body>
+</html>
